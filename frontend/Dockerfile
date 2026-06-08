@@ -1,5 +1,5 @@
 # --- build stage ---
-FROM node:20-slim AS build
+FROM node:26-slim AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # --- run stage ---
-FROM node:20-slim AS run
+FROM node:26-slim AS run
 WORKDIR /app
 ENV NODE_ENV=production
 # adapter-node outputs a self-contained server in ./build
