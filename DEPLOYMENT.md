@@ -2,10 +2,12 @@
 
 PlugPulse is two deployable units. They go to **different** places.
 
+Everything here stays **free and open** (no paid services in the core path).
+
 | Unit | Goes to | Why |
 |---|---|---|
-| `frontend/` (SvelteKit) | **Vercel** | Static + serverless, first-class SvelteKit support |
-| `backend/` (FastAPI + PostGIS) | **Not Vercel** — a container host (Fly.io / Railway / VPS) | Long-running ASGI server + PostgreSQL/PostGIS; Vercel can't run it |
+| `frontend/` (SvelteKit) | **Vercel** (free Hobby tier) | First-class SvelteKit support, no cost |
+| `backend/` (FastAPI + PostGIS) | **Self-hosted Docker** — *not* Vercel | Long-running ASGI server + PostgreSQL/PostGIS; Vercel can't run it. The repo already ships a one-command stack. |
 
 ## Frontend → Vercel
 
@@ -26,17 +28,36 @@ One-time setup in the Vercel dashboard:
 
 Pushes to `main` then auto-deploy; PRs get preview URLs.
 
-## Backend → container host (TODO)
+## Backend → self-hosted Docker (free + open)
 
-Not yet deployed. The CI Docker workflow already publishes images to GHCR:
+The backend is **not** deployed yet. The free, open path is to run the container stack
+yourself — no PaaS bill, no lock-in.
+
+CI already publishes images to GHCR on every push to `main`:
 
 - `ghcr.io/aayushcharde/plugpulseev/backend`
-- `ghcr.io/aayushcharde/plugpulseev/frontend` (unused if the frontend is on Vercel)
+- `ghcr.io/aayushcharde/plugpulseev/frontend` (unused once the frontend is on Vercel)
 
-To run the backend you need a host that can run the container **and** a PostgreSQL database
-with the PostGIS extension. Suggested: Fly.io or Railway (both offer managed Postgres).
-Required env: `DATABASE_URL`, optional `REDIS_URL`, `OCM_API_KEY`. Apply
-[`backend/migrations/001_init.sql`](backend/migrations/001_init.sql) on first boot.
+### Option A — full self-host (one command)
+
+Run the whole stack (backend + PostGIS + Redis) on any box you control — a VPS, a home
+server, or a free-forever VM (e.g. Oracle Cloud Always Free):
+
+```bash
+docker compose up -d            # backend :8000, db :5432 (PostGIS), redis :6379
+```
+
+`docker compose` already applies [`backend/migrations/001_init.sql`](backend/migrations/001_init.sql)
+on the database's first boot (mounted into the Postgres init dir). Put a free reverse proxy
+(Caddy / nginx) in front for HTTPS, then point the Vercel `PUBLIC_API_BASE_URL` at it.
+
+### Option B — backend container + free managed Postgres
+
+If you'd rather not run the database yourself, use a durable **free-tier Postgres that
+supports the PostGIS extension** — e.g. **Neon** or **Supabase** — and run only the backend
+container. Required env: `DATABASE_URL` (the managed Postgres URL), optional `REDIS_URL`,
+`OCM_API_KEY`. Run `CREATE EXTENSION postgis;` and apply
+[`backend/migrations/001_init.sql`](backend/migrations/001_init.sql) once against that database.
 
 ## After both are live
 
