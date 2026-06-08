@@ -17,6 +17,7 @@ node_modules/
 build/
 dist/
 .vite/
+.vercel/
 npm-debug.log*
 
 # Env / secrets

@@ -6,7 +6,7 @@ import globals from "globals";
 export default ts.config(
   // Never lint generated/build output or deps.
   {
-    ignores: ["build/", ".svelte-kit/", "dist/", "node_modules/"],
+    ignores: ["build/", ".svelte-kit/", ".vercel/", "dist/", "node_modules/"],
   },
   js.configs.recommended,
   ...ts.configs.recommended,
