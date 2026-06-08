@@ -15,6 +15,12 @@ def _int(name: str, default: int) -> int:
     return int(raw) if raw else default
 
 
+def _csv(name: str) -> tuple[str, ...]:
+    """Parse a comma-separated env var into a tuple of trimmed, non-empty values."""
+    raw = os.environ.get(name, "")
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = os.environ.get(
@@ -22,6 +28,10 @@ class Settings:
     )
     redis_url: str | None = os.environ.get("REDIS_URL") or None
     ocm_api_key: str | None = os.environ.get("OCM_API_KEY") or None
+
+    # Browser origins allowed to call the API (the frontend runs on a different
+    # origin — e.g. Vercel). Empty by default: no cross-origin access.
+    cors_allow_origins: tuple[str, ...] = _csv("CORS_ALLOW_ORIGINS")
 
     # --- performance knobs (tune without code changes) ---
     # Hard cap on stations returned per request — never ship the whole planet.

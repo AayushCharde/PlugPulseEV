@@ -1,0 +1,77 @@
+# Production self-host stack — free + open, no paid services.
+#
+# Backend + PostGIS + Redis behind Caddy (automatic HTTPS via Let's Encrypt).
+# The SvelteKit frontend is deployed separately on Vercel, so it is
+# intentionally NOT in this file.
+#
+# Usage on your server (a VPS, home box, or a free-forever VM):
+#   cp .env.prod.example .env      # then edit — set DOMAIN + POSTGRES_PASSWORD
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# DNS: point an A/AAAA record for $DOMAIN at this server BEFORE first boot so
+# Caddy can complete the HTTPS certificate challenge.
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-plugpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-plugpulse}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Schema (incl. the GIST spatial index) runs automatically on first boot.
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-plugpulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # No published ports: the database is reachable only on the compose network.
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"] # cache-only
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-plugpulse}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-plugpulse}
+      REDIS_URL: redis://redis:6379/0
+      OCM_API_KEY: ${OCM_API_KEY:-}
+      # Browser origins allowed to call the API (your Vercel URL + custom domain).
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # No published ports: Caddy proxies to it over the internal network.
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # persisted certificates — don't lose this volume
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
