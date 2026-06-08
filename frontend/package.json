@@ -1,0 +1,29 @@
+{
+  "name": "plugpulse-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "maplibre-gl": "5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "5.2.11",
+    "@sveltejs/kit": "2.15.1",
+    "@sveltejs/vite-plugin-svelte": "5.0.3",
+    "@types/node": "22.10.2",
+    "eslint": "9.17.0",
+    "svelte": "5.16.0",
+    "svelte-check": "4.1.1",
+    "typescript": "5.7.2",
+    "vite": "6.0.6",
+    "vitest": "2.1.8"
+  }
+}
