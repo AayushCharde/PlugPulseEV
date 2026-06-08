@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Focus on the user problem, not the solution.
+      placeholder: As a driver, I can't tell how long the queue at a charger is...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Open-source principles
+      options:
+        - label: This does not require a proprietary or paid-only service in the core
+          required: true

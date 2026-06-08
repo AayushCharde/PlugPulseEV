@@ -1,0 +1,7 @@
+# Default owners for everything in the repo.
+*                 @AayushCharde
+
+# Area-specific owners (add teammates as the project grows).
+/backend/         @AayushCharde
+/frontend/        @AayushCharde
+/.github/         @AayushCharde

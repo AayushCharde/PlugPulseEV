@@ -1,0 +1,18 @@
+# PlugPulse
+
+> Open-source, community-verified EV charger reliability. PlugPulse shows where EV
+> chargers are and whether they actually work right now, using one-tap reports from
+> the community with a freshness-weighted reliability score. Built on open data
+> (Open Charge Map, OpenStreetMap) and free to self-host.
+
+## Core
+- [Home](https://plugpulse.app/): Find working EV chargers near you, verified by the community.
+- [How it works](https://plugpulse.app/how-it-works): How community reports and the reliability score work.
+- [FAQ](https://plugpulse.app/faq): Common questions about coverage, accuracy, and privacy.
+
+## Project
+- [GitHub](https://github.com/AayushCharde/plugpulse): Source code (AGPL-3.0), self-hosting instructions.
+- [About](https://plugpulse.app/about): Why PlugPulse exists and how the data stays open.
+
+## Optional
+- [Open data & attribution](https://plugpulse.app/data): Data sources and licenses (Open Charge Map, OpenFreeMap, OpenStreetMap).

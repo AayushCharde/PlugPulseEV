@@ -1,0 +1,35 @@
+# PlugPulse robots.txt
+# Replace the sitemap host with your real domain before deploying.
+
+# Default: allow all standard search crawlers.
+User-agent: *
+Allow: /
+
+# Explicitly welcome AI / generative-engine crawlers so PlugPulse can be cited
+# in ChatGPT, Claude, Perplexity, and Gemini / Google AI Overviews answers.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+# Don't waste crawl budget on the API.
+User-agent: *
+Disallow: /api/
+
+Sitemap: https://plugpulse.app/sitemap.xml
