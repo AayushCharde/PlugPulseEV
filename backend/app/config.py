@@ -29,6 +29,13 @@ class Settings:
     redis_url: str | None = os.environ.get("REDIS_URL") or None
     ocm_api_key: str | None = os.environ.get("OCM_API_KEY") or None
 
+    # --- OIDC / auth (optional; auth is OFF when these are unset) ---
+    # Authentik (or any OIDC provider) issuer, JWKS endpoint, and our client id
+    # (the expected token audience).
+    oidc_issuer: str | None = os.environ.get("OIDC_ISSUER") or None
+    oidc_jwks_url: str | None = os.environ.get("OIDC_JWKS_URL") or None
+    oidc_audience: str | None = os.environ.get("OIDC_AUDIENCE") or None
+
     # Browser origins allowed to call the API (the frontend runs on a different
     # origin — e.g. Vercel). Empty by default: no cross-origin access.
     cors_allow_origins: tuple[str, ...] = _csv("CORS_ALLOW_ORIGINS")

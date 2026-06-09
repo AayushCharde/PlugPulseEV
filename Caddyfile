@@ -6,3 +6,9 @@
 	encode gzip
 	reverse_proxy backend:8000
 }
+
+# Authentik (OIDC identity provider) on its own subdomain.
+{$AUTH_DOMAIN} {
+	encode gzip
+	reverse_proxy authentik-server:9000
+}
