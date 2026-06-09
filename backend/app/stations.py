@@ -8,6 +8,7 @@ joined with a freshness-weighted reliability score. Reuses
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Mapping, Sequence
@@ -121,7 +122,11 @@ def assemble_reliability(
     return result
 
 
-async def _maybe_sync_ocm(box: BBox, maxresults: int) -> None:
+# Keep references to background tasks so they aren't garbage-collected mid-flight.
+_background_tasks: set[asyncio.Task[None]] = set()
+
+
+async def _sync_ocm(box: BBox, maxresults: int) -> None:
     """Refresh this viewport from OCM unless recently synced or far too large.
 
     Never raises: on any OCM/DB error we log and serve whatever the DB has.
@@ -141,6 +146,30 @@ async def _maybe_sync_ocm(box: BBox, maxresults: int) -> None:
     await cache.set(key, "1", settings.ocm_sync_ttl_seconds)
 
 
+def _schedule_background_sync(box: BBox, maxresults: int) -> None:
+    """Fire-and-forget OCM refresh so a warm viewport isn't blocked by the network."""
+    task = asyncio.create_task(_sync_ocm(box, maxresults))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+async def _fetch_rows(
+    box: BBox, connector: str | None, min_power_kw: float | None, limit: int
+) -> list[asyncpg.Record]:
+    connector_filter = json.dumps([{"ConnectionType": {"Title": connector}}]) if connector else None
+    return await db.fetch(
+        _SELECT_SQL,
+        box.west,
+        box.south,
+        box.east,
+        box.north,
+        connector,
+        connector_filter,
+        min_power_kw,
+        limit,
+    )
+
+
 @router.get("/stations", response_model=list[StationOut])
 async def list_stations(
     bbox: str,
@@ -155,20 +184,14 @@ async def list_stations(
 
     capped = min(limit or settings.max_stations_per_request, settings.max_stations_per_request)
 
-    await _maybe_sync_ocm(box, capped)
-
-    connector_filter = json.dumps([{"ConnectionType": {"Title": connector}}]) if connector else None
-    rows = await db.fetch(
-        _SELECT_SQL,
-        box.west,
-        box.south,
-        box.east,
-        box.north,
-        connector,
-        connector_filter,
-        min_power_kw,
-        capped,
-    )
+    rows = await _fetch_rows(box, connector, min_power_kw, capped)
+    if rows:
+        # Warm viewport: refresh from OCM in the background so the response is fast.
+        _schedule_background_sync(box, capped)
+    else:
+        # Cold/empty viewport: block on a sync, then re-query once.
+        await _sync_ocm(box, capped)
+        rows = await _fetch_rows(box, connector, min_power_kw, capped)
 
     station_ids = [row["id"] for row in rows]
     report_rows: list[Mapping[str, Any]] = []
