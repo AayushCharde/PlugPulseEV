@@ -16,6 +16,9 @@ community-verified source of truth. PlugPulse is that layer.
 
 See [`PlugPulse-Project-Spec.md`](./PlugPulse-Project-Spec.md) for the full design.
 
+New here? The [Handbook](./docs/handbook/README.md) explains the project and how to
+deploy it in plain language, chapter by chapter.
+
 ## Stack
 
 | Layer | Tech | Notes |
