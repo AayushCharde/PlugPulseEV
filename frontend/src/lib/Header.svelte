@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { page } from "$app/stores";
+  import { signIn, signOut } from "@auth/sveltekit/client";
   import { currentTheme, toggleTheme, type Theme } from "$lib/theme";
 
   let theme: Theme = "light";
@@ -11,6 +13,8 @@
   function flip(): void {
     theme = toggleTheme();
   }
+
+  $: session = $page.data.session;
 </script>
 
 <header class="header">
@@ -36,7 +40,15 @@
         </svg>
       {/if}
     </button>
-    <!-- auth control is added in PR-E -->
+
+    {#if session?.user}
+      <span class="user" title={session.user.email ?? undefined}>
+        {session.user.name ?? session.user.email ?? "Signed in"}
+      </span>
+      <button class="btn-ghost" on:click={() => signOut()}>Sign out</button>
+    {:else}
+      <button class="btn-primary" on:click={() => signIn("authentik")}>Sign in</button>
+    {/if}
   </div>
 </header>
 
@@ -74,5 +86,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+  .user {
+    max-width: 28vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 0.9rem;
   }
 </style>
