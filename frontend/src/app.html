@@ -3,7 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0f766e" />
+    <meta name="theme-color" content="#15803d" />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash (FOUC).
+      // No stored choice => leave it to prefers-color-scheme in CSS.
+      try {
+        var t = localStorage.getItem("pp-theme");
+        if (t === "light" || t === "dark")
+          document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
