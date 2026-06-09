@@ -48,6 +48,10 @@ services:
       OCM_API_KEY: ${OCM_API_KEY:-}
       # Browser origins allowed to call the API (your Vercel URL + custom domain).
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-}
+      # OIDC (Authentik) — set after creating the provider (see DEPLOYMENT.md).
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
     depends_on:
       db:
         condition: service_healthy
@@ -56,10 +60,68 @@ services:
     restart: unless-stopped
     # No published ports: Caddy proxies to it over the internal network.
 
+  # --- Authentik: self-hosted OIDC identity provider (own Postgres + Redis) ---
+  authentik-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_PG_PASS:?set AUTHENTIK_PG_PASS in .env}
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  authentik-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - authentik_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.12}
+    command: server
+    environment: &authentik-env
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?set AUTHENTIK_SECRET_KEY in .env}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # No published ports: Caddy fronts it on the auth subdomain.
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.12}
+    command: worker
+    environment: *authentik-env
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      AUTH_DOMAIN: ${AUTH_DOMAIN:?set AUTH_DOMAIN in .env}
     ports:
       - "80:80"
       - "443:443"
@@ -69,9 +131,12 @@ services:
       - caddy_config:/config
     depends_on:
       - backend
+      - authentik-server
     restart: unless-stopped
 
 volumes:
   db_data:
+  authentik_db:
+  authentik_redis:
   caddy_data:
   caddy_config:

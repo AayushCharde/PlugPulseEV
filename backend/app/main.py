@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
+from app.auth import router as auth_router
 from app.cache import cache
 from app.config import settings
 from app.db import db
@@ -66,3 +67,4 @@ def health() -> Health:
 
 
 app.include_router(stations_router)
+app.include_router(auth_router)

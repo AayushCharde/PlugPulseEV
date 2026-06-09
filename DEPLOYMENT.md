@@ -72,6 +72,30 @@ container. Required env: `DATABASE_URL` (the managed Postgres URL), optional `RE
 `OCM_API_KEY`, `CORS_ALLOW_ORIGINS`. Run `CREATE EXTENSION postgis;` and apply
 [`backend/migrations/001_init.sql`](backend/migrations/001_init.sql) once against that database.
 
+## Authentication — Authentik (OIDC)
+
+Auth is **self-hosted Authentik** (open source). The backend validates Authentik-issued JWTs;
+the frontend logs in via OIDC. Auth is **optional** — with the `OIDC_*` env unset the public
+map works unchanged and `/me` returns 503.
+
+Authentik runs as part of both compose files (its own Postgres + Redis). In prod it's exposed
+on `AUTH_DOMAIN` via Caddy (auto-HTTPS). One-time setup:
+
+1. Bring up the stack (`docker compose up -d`, or prod). Point `AUTH_DOMAIN`'s DNS at the server.
+2. Open Authentik (`http://localhost:9000` dev, or `https://$AUTH_DOMAIN` prod) and complete the
+   initial admin flow at `/if/flow/initial-setup/`.
+3. Create an **OAuth2/OpenID Provider** + an **Application** ("PlugPulse"). Set redirect URIs:
+   - dev: `http://localhost:5173/auth/callback/authentik`
+   - prod: `https://plugpulse.vercel.app/auth/callback/authentik`
+4. Copy into your env:
+   - `OIDC_ISSUER=https://$AUTH_DOMAIN/application/o/<app-slug>/`
+   - `OIDC_JWKS_URL=https://$AUTH_DOMAIN/application/o/<app-slug>/jwks/`
+   - `OIDC_AUDIENCE=<Client ID>` (backend) and the frontend `AUTH_AUTHENTIK_*` (see frontend env).
+5. Restart the backend (and frontend). Verify: sign in, then `GET /me` returns your user.
+
+`users` are created on first authenticated request (upsert by OIDC `sub`); the
+[`002_users.sql`](backend/migrations/002_users.sql) migration runs on the DB's first boot.
+
 ## CORS (frontend ↔ backend are different origins)
 
 Because the frontend is on Vercel and the backend on your own host, the browser blocks
