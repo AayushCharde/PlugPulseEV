@@ -72,6 +72,40 @@ container. Required env: `DATABASE_URL` (the managed Postgres URL), optional `RE
 `OCM_API_KEY`, `CORS_ALLOW_ORIGINS`. Run `CREATE EXTENSION postgis;` and apply
 [`backend/migrations/001_init.sql`](backend/migrations/001_init.sql) once against that database.
 
+### Option C — Render + Supabase (managed, no server to run) — *recommended free path*
+
+Everything stays free and there's no machine to maintain: frontend on Vercel, backend
+(this FastAPI container) on **Render** free, database on **Supabase** free (Postgres +
+PostGIS). A [`render.yaml`](render.yaml) blueprint is included.
+
+**1. Supabase (database):**
+- Create a project at [supabase.com](https://supabase.com) (free, no card).
+- SQL Editor → enable PostGIS and apply the migrations, in order:
+  `001_init.sql`, `002_users.sql`, `003_connectors_gin.sql` (paste each, or
+  `psql "<conn>" -f backend/migrations/00X_*.sql`). `001` runs `CREATE EXTENSION postgis`.
+- Project Settings → Database → copy the **Direct connection** string (or **Session**
+  pooler). **Do not use the Transaction pooler** (port 6543) — asyncpg uses prepared
+  statements, which it doesn't support. The string includes `sslmode=require`.
+
+**2. Render (backend):**
+- New → **Blueprint** → pick this repo; Render reads `render.yaml` (Docker, free plan,
+  health check `/health`).
+- Set the dashboard env vars: `DATABASE_URL` = the Supabase Direct string,
+  `OCM_API_KEY` = your free OCM key. `CORS_ALLOW_ORIGINS` is preset to the Vercel origin.
+  Leave `REDIS_URL` and `OIDC_*` unset (cache optional; auth deferred).
+- Deploy → grab the service URL `https://<name>.onrender.com`.
+
+**3. Connect the frontend:** in Vercel set `PUBLIC_API_BASE_URL` to the Render URL →
+redeploy. Verify `https://<name>.onrender.com/health` and `/stations?bbox=...`.
+
+**Heads-up (free-tier behaviour):** the Render service **sleeps after ~15 min idle**
+(first request then takes ~1 min); Supabase **pauses after 7 days idle** (resume in the
+dashboard, or hit it periodically). A simple uptime ping to `/health` keeps both warm.
+
+> Auth on this path: defer it (the map is public), or later use **Supabase Auth** in place
+> of Authentik — it issues verifiable JWTs, so the backend's existing OIDC verification can
+> point at Supabase. Authentik is only needed for the self-host Option A.
+
 ## Authentication — Authentik (OIDC)
 
 Auth is **self-hosted Authentik** (open source). The backend validates Authentik-issued JWTs;
