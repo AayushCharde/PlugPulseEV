@@ -6,13 +6,13 @@
 > (Open Charge Map, OpenStreetMap) and free to self-host.
 
 ## Core
-- [Home](https://plugpulse.app/): Find working EV chargers near you, verified by the community.
-- [How it works](https://plugpulse.app/how-it-works): How community reports and the reliability score work.
-- [FAQ](https://plugpulse.app/faq): Common questions about coverage, accuracy, and privacy.
+- [Home](https://plugpulse.vercel.app/): Find working EV chargers near you, verified by the community.
+- [How it works](https://plugpulse.vercel.app/how-it-works): How community reports and the reliability score work.
+- [FAQ](https://plugpulse.vercel.app/faq): Common questions about coverage, accuracy, and privacy.
 
 ## Project
-- [GitHub](https://github.com/AayushCharde/plugpulse): Source code (AGPL-3.0), self-hosting instructions.
-- [About](https://plugpulse.app/about): Why PlugPulse exists and how the data stays open.
+- [GitHub](https://github.com/AayushCharde/PlugPulseEV): Source code (AGPL-3.0), self-hosting instructions.
+- [About](https://plugpulse.vercel.app/about): Why PlugPulse exists and how the data stays open.
 
 ## Optional
-- [Open data & attribution](https://plugpulse.app/data): Data sources and licenses (Open Charge Map, OpenFreeMap, OpenStreetMap).
+- [Open data & attribution](https://plugpulse.vercel.app/data): Data sources and licenses (Open Charge Map, OpenFreeMap, OpenStreetMap).

@@ -32,4 +32,4 @@ Allow: /
 User-agent: *
 Disallow: /api/
 
-Sitemap: https://plugpulse.app/sitemap.xml
+Sitemap: https://plugpulse.vercel.app/sitemap.xml

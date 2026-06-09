@@ -87,8 +87,9 @@ environments grow, the open-source upgrade path is **Infisical** (self-hosted or
 tier): store secrets there and inject them at launch without changing the stack, e.g.
 `infisical run -- docker compose -f docker-compose.prod.yml up -d`.
 
-## After both are live
+## Production domain
 
-Replace the `https://plugpulse.app` placeholder domain in
-[`frontend/src/lib/seo.ts`](frontend/src/lib/seo.ts), `frontend/static/robots.txt`, and
-`frontend/static/llms.txt` with the real domain.
+The frontend is live at **https://plugpulse.vercel.app** — this is the canonical domain,
+set in [`frontend/src/lib/seo.ts`](frontend/src/lib/seo.ts) (`SITE.url`),
+`frontend/static/robots.txt` (sitemap), and `frontend/static/llms.txt`. If you later move to a
+custom domain (e.g. `plugpulse.app`), update those three places.
