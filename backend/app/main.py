@@ -1,19 +1,39 @@
-"""PlugPulse API — minimal skeleton.
+"""PlugPulse API.
 
-Real routes (stations, reports, sync with Open Charge Map) land in later PRs.
-This gives CI a runnable app and a health check to build on.
+Serves the viewport-scoped stations endpoint (with on-demand Open Charge Map
+ingest) on top of the reliability scoring layer. Report writing + live scoring
+land in a later phase.
 """
 
 from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
+from app.cache import cache
 from app.config import settings
+from app.db import db
+from app.stations import router as stations_router
 
-app = FastAPI(title="PlugPulse API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Open the DB pool + cache on startup; close them on shutdown."""
+    await db.connect()
+    await cache.connect()
+    try:
+        yield
+    finally:
+        await cache.close()
+        await db.close()
+
+
+app = FastAPI(title="PlugPulse API", version="0.1.0", lifespan=lifespan)
 
 # Compress JSON responses. Station lists are repetitive and compress well,
 # typically cutting transfer size by ~70-80% over the wire.
@@ -43,3 +63,6 @@ def health() -> Health:
         version=app.version,
         max_stations_per_request=settings.max_stations_per_request,
     )
+
+
+app.include_router(stations_router)

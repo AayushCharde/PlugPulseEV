@@ -43,6 +43,9 @@ class Settings:
     db_pool_max_size: int = _int("DB_POOL_MAX_SIZE", 10)
     # Only score reports newer than this (older ones decay to ~0 anyway).
     reliability_lookback_hours: int = _int("RELIABILITY_LOOKBACK_HOURS", 24)
+    # How long we skip re-fetching a viewport tile from Open Charge Map.
+    # Station geometry changes slowly, so this can be generous.
+    ocm_sync_ttl_seconds: int = _int("OCM_SYNC_TTL_SECONDS", 600)
 
 
 settings = Settings()
