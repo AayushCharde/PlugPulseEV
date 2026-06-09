@@ -1,0 +1,31 @@
+# Render Blueprint — deploys the PlugPulse backend (FastAPI) as a free web service.
+# Database is Supabase (managed Postgres + PostGIS), set via DATABASE_URL below.
+# Import this in the Render dashboard: New → Blueprint → pick this repo.
+#
+# Notes:
+# - Free web services sleep after ~15 min idle and cold-start (~1 min) on the next request.
+# - Redis is intentionally omitted: the cache is optional and no-ops when REDIS_URL is unset.
+# - Auth (OIDC) is deferred; leave OIDC_* unset for now (the public map works without it).
+
+services:
+  - type: web
+    name: plugpulse-backend
+    runtime: docker
+    repo: https://github.com/AayushCharde/PlugPulseEV
+    branch: main
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Supabase DIRECT connection string (or session pooler) — NOT the transaction
+      # pooler, since asyncpg uses prepared statements. Set in the Render dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Allow the deployed frontend origin(s) to call the API.
+      - key: CORS_ALLOW_ORIGINS
+        value: https://plugpulse.vercel.app
+      # Open Charge Map key (free) — set in the dashboard to load real stations.
+      - key: OCM_API_KEY
+        sync: false
