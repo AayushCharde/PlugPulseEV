@@ -34,6 +34,10 @@
   let stationsById = new Map<Station["id"], Station>();
   let selectedStation: Station | undefined;
   let loadError: string | undefined;
+  let loading = false;
+  let loaded = false; // true after the first successful load
+
+  $: showEmpty = loaded && !loading && !loadError && stationsById.size === 0;
 
   // Filters — changing either re-queries immediately.
   let connector = "";
@@ -63,22 +67,29 @@
   async function reload(): Promise<void> {
     if (!map) return;
     inFlight?.abort();
-    inFlight = new AbortController();
+    const controller = new AbortController();
+    inFlight = controller;
     const query: StationQuery = {
       bbox: bboxFromMap(map),
       connector: connector || undefined,
       minPowerKw: minPowerForTier(powerTier),
       limit: DEFAULT_STATION_LIMIT,
     };
+    loading = true;
     try {
-      const stations = await fetchStations(apiBase, query, fetch, inFlight.signal);
+      const stations = await fetchStations(apiBase, query, fetch, controller.signal);
+      if (inFlight !== controller) return; // a newer request superseded this one
       stationsById = new Map(stations.map((s) => [s.id, s]));
       const source = map.getSource("stations") as GeoJSONSource | undefined;
       source?.setData(stationsToFeatureCollection(stations));
       loadError = undefined;
+      loaded = true;
     } catch (err) {
-      if ((err as DOMException)?.name === "AbortError") return;
+      if ((err as DOMException)?.name === "AbortError" || inFlight !== controller) return;
       loadError = err instanceof Error ? err.message : "Failed to load stations";
+      loaded = true;
+    } finally {
+      if (inFlight === controller) loading = false;
     }
   }
 
@@ -197,8 +208,22 @@
   </label>
 </div>
 
+{#if loading}
+  <div class="loading-pill" role="status">Loading chargers…</div>
+{/if}
+
 {#if loadError}
   <div class="toast" role="alert">{loadError}</div>
+{/if}
+
+{#if showEmpty}
+  <div class="empty" role="status">
+    <img src="/img/ev-charger.webp" alt="" width="320" height="120" loading="lazy" decoding="async" />
+    <div class="empty-body">
+      <h2>No chargers in view</h2>
+      <p>Try zooming out or panning to a populated area — chargers load automatically as you move the map.</p>
+    </div>
+  </div>
 {/if}
 
 {#if selectedStation}
@@ -242,5 +267,61 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+  .loading-pill {
+    position: fixed;
+    top: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 8;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 999px;
+    box-shadow: var(--shadow-sm);
+    font-size: 0.85rem;
+  }
+  .empty {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 8;
+    width: min(420px, calc(100vw - 32px));
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    padding-right: 14px;
+  }
+  .empty img {
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    flex: none;
+  }
+  .empty-body {
+    padding: 12px 0;
+  }
+  .empty-body h2 {
+    font-size: 1rem;
+    margin: 0 0 4px;
+  }
+  .empty-body p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+  @media (max-width: 520px) {
+    .empty img {
+      width: 84px;
+      height: 84px;
+    }
   }
 </style>
