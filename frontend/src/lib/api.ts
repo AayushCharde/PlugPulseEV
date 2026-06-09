@@ -20,6 +20,14 @@ export interface StationQuery {
 
 export const DEFAULT_STATION_LIMIT = 300;
 
+export const DEFAULT_API_BASE = "http://localhost:8000";
+
+/** Normalize a configured API base URL: fall back to localhost, strip trailing slash. */
+export function resolveApiBase(raw: string | undefined): string {
+  const base = (raw ?? "").trim() || DEFAULT_API_BASE;
+  return base.replace(/\/+$/, "");
+}
+
 /** Build the `/stations` request URL from a viewport query. */
 export function stationsUrl(apiBase: string, q: StationQuery): string {
   const params = new URLSearchParams();

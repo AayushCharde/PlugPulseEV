@@ -39,3 +39,21 @@ export function evidenceLine(r: Reliability): string {
   const approx = Math.round(r.confidence);
   return `${approx} recent confirmation${approx === 1 ? "" : "s"}`;
 }
+
+/**
+ * Literal hex colors per reliability color name, for each theme — MapLibre paint
+ * expressions need literal colors (not CSS vars). Mirrors the tokens in app.css.
+ */
+export const RELIABILITY_HEX: Record<
+  "light" | "dark",
+  Record<ReliabilityDisplay["color"], string>
+> = {
+  light: { green: "#16a34a", amber: "#d97706", red: "#dc2626", grey: "#9ca3af" },
+  dark: { green: "#22c55e", amber: "#fbbf24", red: "#f87171", grey: "#94a3b8" },
+};
+
+/** Hex color for a reliability label in the given theme (derived via describeReliability). */
+export function reliabilityHex(label: ReliabilityLabel, theme: "light" | "dark"): string {
+  const { color } = describeReliability({ label, score: 0, confidence: 0 });
+  return RELIABILITY_HEX[theme][color];
+}

@@ -32,6 +32,14 @@ Trip routing uses [OpenRouteService](https://openrouteservice.org) or a self-hos
 [OSRM](https://project-osrm.org) / [Valhalla](https://github.com/valhalla/valhalla)
 instance, all built on OpenStreetMap data.
 
+## Photography — Unsplash
+
+Decorative imagery is from [Unsplash](https://unsplash.com) under the
+[Unsplash License](https://unsplash.com/license) (free for commercial use; attribution
+not required but credited here). Images are downloaded and self-hosted (`frontend/static/img/`).
+
+- `ev-charger.webp` — photo by [Mohamed B.](https://unsplash.com/@bangscreative) on Unsplash.
+
 ## Our own contributions
 
 Reliability reports contributed by PlugPulse users are released under

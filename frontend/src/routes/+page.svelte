@@ -1,35 +1,102 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import "maplibre-gl/dist/maplibre-gl.css";
-  import type { Map as MapLibreMap } from "maplibre-gl";
+  import type {
+    Map as MapLibreMap,
+    GeoJSONSource,
+    ExpressionSpecification,
+    MapLayerMouseEvent,
+  } from "maplibre-gl";
+  import { env } from "$env/dynamic/public";
+  import { DEFAULT_STATION_LIMIT, resolveApiBase, type BBox, type StationQuery } from "$lib/api";
+  import { debounce } from "$lib/debounce";
+  import { reliabilityHex } from "$lib/reliability";
+  import { currentTheme, type Theme } from "$lib/theme";
+  import {
+    fetchStations,
+    minPowerForTier,
+    stationsToFeatureCollection,
+    type PowerTier,
+    type Station,
+  } from "$lib/stations";
+  import StationDetail from "$lib/StationDetail.svelte";
 
-  // Phase 0 "hello map": a full-screen MapLibre map on free OpenFreeMap tiles
-  // (no API key, no usage limits). Real station markers arrive once the
-  // backend /stations bbox endpoint lands.
+  const apiBase = resolveApiBase(env.PUBLIC_API_BASE_URL);
 
-  let mapContainer: HTMLDivElement;
-  let map: MapLibreMap | undefined;
-
-  // Fallback view if geolocation is denied/unavailable. Roughly Hyderabad —
-  // the same region the API unit tests exercise.
   const DEFAULT_CENTER: [number, number] = [78.45, 17.4];
   const DEFAULT_ZOOM = 11;
 
+  let mapContainer: HTMLDivElement;
+  let map: MapLibreMap | undefined;
+  let inFlight: AbortController | undefined;
+  let themeObserver: MutationObserver | undefined;
+
+  let stationsById = new Map<Station["id"], Station>();
+  let selectedStation: Station | undefined;
+  let loadError: string | undefined;
+
+  // Filters — changing either re-queries immediately.
+  let connector = "";
+  let powerTier: PowerTier = "any";
+
+  const CONNECTORS = ["CCS (Type 2)", "Type 2", "CHAdeMO", "Type 1 (J1772)"];
+
+  function colorExpr(theme: Theme): ExpressionSpecification {
+    return [
+      "match",
+      ["get", "reliabilityLabel"],
+      "likely_working",
+      reliabilityHex("likely_working", theme),
+      "mixed",
+      reliabilityHex("mixed", theme),
+      "likely_down",
+      reliabilityHex("likely_down", theme),
+      reliabilityHex("unknown", theme),
+    ] as unknown as ExpressionSpecification;
+  }
+
+  function bboxFromMap(m: MapLibreMap): BBox {
+    const b = m.getBounds();
+    return { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() };
+  }
+
+  async function reload(): Promise<void> {
+    if (!map) return;
+    inFlight?.abort();
+    inFlight = new AbortController();
+    const query: StationQuery = {
+      bbox: bboxFromMap(map),
+      connector: connector || undefined,
+      minPowerKw: minPowerForTier(powerTier),
+      limit: DEFAULT_STATION_LIMIT,
+    };
+    try {
+      const stations = await fetchStations(apiBase, query, fetch, inFlight.signal);
+      stationsById = new Map(stations.map((s) => [s.id, s]));
+      const source = map.getSource("stations") as GeoJSONSource | undefined;
+      source?.setData(stationsToFeatureCollection(stations));
+      loadError = undefined;
+    } catch (err) {
+      if ((err as DOMException)?.name === "AbortError") return;
+      loadError = err instanceof Error ? err.message : "Failed to load stations";
+    }
+  }
+
+  const debouncedReload = debounce(() => void reload(), 350);
+
   onMount(() => {
-    // Dynamic import keeps MapLibre out of the SSR bundle (it touches `window`).
     void (async () => {
       const { Map, NavigationControl, GeolocateControl } = await import("maplibre-gl");
 
-      map = new Map({
+      const m = new Map({
         container: mapContainer,
-        // OpenFreeMap "liberty" style — MIT, OSM data, no key required.
         style: "https://tiles.openfreemap.org/styles/liberty",
         center: DEFAULT_CENTER,
         zoom: DEFAULT_ZOOM,
       });
-
-      map.addControl(new NavigationControl(), "top-right");
-      map.addControl(
+      map = m;
+      m.addControl(new NavigationControl(), "top-right");
+      m.addControl(
         new GeolocateControl({
           positionOptions: { enableHighAccuracy: true },
           trackUserLocation: true,
@@ -37,25 +104,65 @@
         "top-right",
       );
 
-      // Recenter on the user if they allow it; otherwise keep the default view.
+      m.on("load", () => {
+        m.addSource("stations", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        m.addLayer({
+          id: "station-circles",
+          type: "circle",
+          source: "stations",
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4, 14, 8],
+            "circle-color": colorExpr(currentTheme()),
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+
+        m.on("click", "station-circles", (e: MapLayerMouseEvent) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          const found = stationsById.get(feature.properties?.id);
+          if (found) selectedStation = found;
+        });
+        m.on("mouseenter", "station-circles", () => {
+          m.getCanvas().style.cursor = "pointer";
+        });
+        m.on("mouseleave", "station-circles", () => {
+          m.getCanvas().style.cursor = "";
+        });
+
+        m.on("moveend", debouncedReload);
+        void reload();
+      });
+
+      // Recenter on the user if allowed; otherwise keep the default view.
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            map?.flyTo({
-              center: [pos.coords.longitude, pos.coords.latitude],
-              zoom: 13,
-            });
-          },
-          () => {
-            // Permission denied or timed out — the default center stays.
-          },
+          (pos) => m.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 13 }),
+          () => {},
           { enableHighAccuracy: true, timeout: 5000 },
         );
       }
+
+      // Recolor circles when the user toggles the theme.
+      themeObserver = new MutationObserver(() => {
+        if (map?.getLayer("station-circles")) {
+          map.setPaintProperty("station-circles", "circle-color", colorExpr(currentTheme()));
+        }
+      });
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
     })();
   });
 
   onDestroy(() => {
+    inFlight?.abort();
+    themeObserver?.disconnect();
     map?.remove();
   });
 </script>
@@ -70,15 +177,70 @@
 
 <div class="map" bind:this={mapContainer}></div>
 
-<style>
-  :global(html),
-  :global(body) {
-    margin: 0;
-    height: 100%;
-  }
+<div class="filters">
+  <label>
+    <span class="sr-only">Connector</span>
+    <select class="field" bind:value={connector} on:change={() => void reload()}>
+      <option value="">Any connector</option>
+      {#each CONNECTORS as c}
+        <option value={c}>{c}</option>
+      {/each}
+    </select>
+  </label>
+  <label>
+    <span class="sr-only">Power</span>
+    <select class="field" bind:value={powerTier} on:change={() => void reload()}>
+      <option value="any">Any power</option>
+      <option value="fast">Fast (≥22 kW)</option>
+      <option value="rapid">Rapid (≥50 kW)</option>
+    </select>
+  </label>
+</div>
 
+{#if loadError}
+  <div class="toast" role="alert">{loadError}</div>
+{/if}
+
+{#if selectedStation}
+  <StationDetail station={selectedStation} on:close={() => (selectedStation = undefined)} />
+{/if}
+
+<style>
   .map {
     position: absolute;
     inset: 0;
+  }
+  /* Keep MapLibre's controls clear of the floating header. */
+  :global(.maplibregl-ctrl-top-right),
+  :global(.maplibregl-ctrl-top-left) {
+    top: 64px;
+  }
+  .filters {
+    position: fixed;
+    top: 68px;
+    left: 16px;
+    z-index: 8;
+    display: flex;
+    gap: 8px;
+  }
+  .toast {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9;
+    background: var(--rel-red);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 </style>
