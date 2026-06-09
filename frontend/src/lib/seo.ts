@@ -6,8 +6,7 @@
 
 export const SITE = {
   name: "PlugPulse",
-  // TODO: replace with your real production domain.
-  url: "https://plugpulse.app",
+  url: "https://plugpulse.vercel.app",
   description:
     "Find EV chargers that actually work right now — community-verified reliability, open data, free.",
   defaultImage: "/og-default.png",
@@ -73,7 +72,7 @@ export function organizationJsonLd(): Record<string, unknown> {
     name: SITE.name,
     url: SITE.url,
     logo: canonical("/logo.png"),
-    sameAs: ["https://github.com/AayushCharde/plugpulse"],
+    sameAs: ["https://github.com/AayushCharde/PlugPulseEV"],
   };
 }
 
