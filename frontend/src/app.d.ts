@@ -5,10 +5,12 @@ declare global {
   namespace App {
     // interface Error {}
     interface Locals {
-      auth(): Promise<Session | null>;
+      // Set by Auth.js only when auth is configured; absent otherwise.
+      auth?: () => Promise<Session | null>;
     }
     interface PageData {
       session?: Session | null;
+      authEnabled?: boolean;
     }
     // interface PageState {}
     // interface Platform {}
