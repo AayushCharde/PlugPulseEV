@@ -15,6 +15,7 @@
   }
 
   $: session = $page.data.session;
+  $: authEnabled = $page.data.authEnabled;
 </script>
 
 <header class="header">
@@ -41,13 +42,15 @@
       {/if}
     </button>
 
-    {#if session?.user}
-      <span class="user" title={session.user.email ?? undefined}>
-        {session.user.name ?? session.user.email ?? "Signed in"}
-      </span>
-      <button class="btn-ghost" on:click={() => signOut()}>Sign out</button>
-    {:else}
-      <button class="btn-primary" on:click={() => signIn("authentik")}>Sign in</button>
+    {#if authEnabled}
+      {#if session?.user}
+        <span class="user" title={session.user.email ?? undefined}>
+          {session.user.name ?? session.user.email ?? "Signed in"}
+        </span>
+        <button class="btn-ghost" on:click={() => signOut()}>Sign out</button>
+      {:else}
+        <button class="btn-primary" on:click={() => signIn("authentik")}>Sign in</button>
+      {/if}
     {/if}
   </div>
 </header>
