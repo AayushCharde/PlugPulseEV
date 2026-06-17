@@ -1,6 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { fly } from "svelte/transition";
   import { describeReliability, evidenceLine } from "$lib/reliability";
+  import { sourceLabel, formatPower, formatCoords, directionsUrl, displayName } from "$lib/format";
   import type { Station } from "$lib/stations";
 
   export let station: Station;
@@ -9,7 +11,6 @@
 
   $: display = describeReliability(station.reliability);
   $: evidence = evidenceLine(station.reliability);
-  $: sourceLabel = station.source === "osm" ? "© OpenStreetMap" : "Open Charge Map";
 
   function onKeydown(e: KeyboardEvent): void {
     if (e.key === "Escape") dispatch("close");
@@ -18,51 +19,59 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<aside class="panel" role="dialog" aria-label="Station details">
-  <img
-    class="banner"
-    src="/img/ev-charger.webp"
-    alt=""
-    width="360"
-    height="150"
-    loading="lazy"
-    decoding="async"
-  />
-  <button class="close btn-icon" on:click={() => dispatch("close")} aria-label="Close details">
-    ✕
-  </button>
+<aside class="panel" role="dialog" aria-label="Station details" transition:fly={{ y: 24, duration: 180 }}>
+  <div class="banner">
+    <img src="/img/ev-charger.webp" alt="" width="380" height="150" loading="lazy" decoding="async" />
+    <div class="banner-grad"></div>
+    <h2 class="title">{displayName(station)}</h2>
+    <button class="close" on:click={() => dispatch("close")} aria-label="Close details">✕</button>
+  </div>
 
   <div class="body">
-    <h2>{station.name ?? "Unnamed station"}</h2>
-
-    <p class="reliability">
-      <span class="dot" style="background: var(--rel-{display.color})"></span>
-      <strong>{display.text}</strong>
-      <span class="muted">· {evidence}</span>
-    </p>
+    <span class="badge badge-{display.color}">
+      <span class="dot"></span>{display.text}
+    </span>
+    <p class="evidence">{evidence}</p>
 
     <dl>
-      {#if station.operator}
-        <dt>Operator</dt>
-        <dd>{station.operator}</dd>
-      {/if}
+      <dt>Operator</dt>
+      <dd>{station.operator ?? "Unknown"}</dd>
+
       <dt>Max power</dt>
-      <dd>{station.max_power_kw ? `${station.max_power_kw} kW` : "Unknown"}</dd>
-      {#if station.access_type}
-        <dt>Access</dt>
-        <dd>{station.access_type}</dd>
-      {/if}
-      {#if station.connectors.length}
-        <dt>Connectors</dt>
-        <dd class="chips">
-          {#each station.connectors as connector}
-            <span class="chip">{connector}</span>
-          {/each}
-        </dd>
-      {/if}
+      <dd>{formatPower(station.max_power_kw)}</dd>
+
+      <dt>Access</dt>
+      <dd>{station.access_type ?? "Unknown"}</dd>
+
+      <dt>Connectors</dt>
+      <dd>
+        {#if station.connectors.length}
+          <span class="chips">
+            {#each station.connectors as connector}<span class="chip">{connector}</span>{/each}
+          </span>
+        {:else}
+          <span class="muted">Not reported</span>
+        {/if}
+      </dd>
     </dl>
 
-    <p class="source muted">Source: {sourceLabel}</p>
+    <div class="actions">
+      <a
+        class="btn btn-primary"
+        href={directionsUrl(station.lat, station.lng)}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        ➜ Get directions
+      </a>
+      <button class="btn btn-ghost" disabled title="Community reports — coming soon">
+        Report status
+      </button>
+    </div>
+
+    <p class="meta muted">
+      {sourceLabel(station.source)} · {formatCoords(station.lat, station.lng)}
+    </p>
   </div>
 </aside>
 
@@ -72,7 +81,7 @@
     top: 72px;
     right: 16px;
     z-index: 9;
-    width: min(360px, calc(100vw - 32px));
+    width: min(380px, calc(100vw - 32px));
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
@@ -80,44 +89,61 @@
     overflow: hidden;
   }
   .banner {
-    display: block;
+    position: relative;
+    height: 132px;
+  }
+  .banner img {
     width: 100%;
-    height: 150px;
+    height: 100%;
     object-fit: cover;
+    display: block;
     background: var(--surface-2);
+  }
+  .banner-grad {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.05) 30%, rgb(0 0 0 / 0.72));
+  }
+  .title {
+    position: absolute;
+    left: 16px;
+    right: 48px;
+    bottom: 10px;
+    margin: 0;
+    color: #fff;
+    font-size: 1.15rem;
+    line-height: 1.25;
+    text-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
   }
   .close {
     position: absolute;
     top: 10px;
     right: 10px;
-    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.45);
+    color: #fff;
+    cursor: pointer;
     backdrop-filter: blur(4px);
   }
+  .close:hover {
+    background: rgb(0 0 0 / 0.65);
+  }
   .body {
-    padding: 16px;
+    padding: 14px 16px 16px;
   }
-  h2 {
-    font-size: 1.15rem;
-    margin: 0 0 8px;
-  }
-  .reliability {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 12px;
-  }
-  .muted {
+  .evidence {
+    margin: 8px 0 14px;
+    font-size: 0.85rem;
     color: var(--text-muted);
-  }
-  .source {
-    margin: 12px 0 0;
-    font-size: 0.78rem;
   }
   dl {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 6px 14px;
-    margin: 0;
+    grid-template-columns: 92px 1fr;
+    gap: 8px 14px;
+    margin: 0 0 16px;
     font-size: 0.92rem;
   }
   dt {
@@ -137,6 +163,26 @@
     border-radius: 999px;
     padding: 2px 10px;
     font-size: 0.82rem;
+  }
+  .muted {
+    color: var(--text-muted);
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .actions .btn {
+    flex: 1;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .meta {
+    margin: 14px 0 0;
+    font-size: 0.76rem;
   }
   @media (max-width: 520px) {
     .panel {
