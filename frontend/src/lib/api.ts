@@ -20,9 +20,13 @@ export interface StationQuery {
 
 export const DEFAULT_STATION_LIMIT = 300;
 
-export const DEFAULT_API_BASE = "http://localhost:8000";
+// Default to the deployed backend so the app works end-to-end everywhere
+// (production, Vercel previews, shared links) even when PUBLIC_API_BASE_URL
+// isn't set for that environment. Local dev overrides it via .env
+// (PUBLIC_API_BASE_URL=http://localhost:8000).
+export const DEFAULT_API_BASE = "https://plugpulse-backend-v5bu.onrender.com";
 
-/** Normalize a configured API base URL: fall back to localhost, strip trailing slash. */
+/** Normalize a configured API base URL: fall back to the default, strip trailing slash. */
 export function resolveApiBase(raw: string | undefined): string {
   const base = (raw ?? "").trim() || DEFAULT_API_BASE;
   return base.replace(/\/+$/, "");

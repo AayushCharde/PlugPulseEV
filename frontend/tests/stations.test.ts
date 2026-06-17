@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { resolveApiBase } from "../src/lib/api";
+import { resolveApiBase, DEFAULT_API_BASE } from "../src/lib/api";
 import {
   fetchStations,
   minPowerForTier,
@@ -32,9 +32,9 @@ function okResponse(data: unknown): Response {
 }
 
 describe("resolveApiBase", () => {
-  it("falls back to localhost when empty/undefined", () => {
-    expect(resolveApiBase(undefined)).toBe("http://localhost:8000");
-    expect(resolveApiBase("   ")).toBe("http://localhost:8000");
+  it("falls back to the default when empty/undefined", () => {
+    expect(resolveApiBase(undefined)).toBe(DEFAULT_API_BASE);
+    expect(resolveApiBase("   ")).toBe(DEFAULT_API_BASE);
   });
   it("strips a trailing slash and keeps explicit values", () => {
     expect(resolveApiBase("https://api.example.com/")).toBe("https://api.example.com");

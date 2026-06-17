@@ -20,9 +20,11 @@
 
 <header class="header">
   <a class="brand" href="/" aria-label="PlugPulse home">
-    <svg class="bolt" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" />
-    </svg>
+    <span class="mark">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" />
+      </svg>
+    </span>
     <span class="word">PlugPulse</span>
   </a>
 
@@ -68,19 +70,27 @@
     background: color-mix(in srgb, var(--surface) 82%, transparent);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
   }
   .brand {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     text-decoration: none;
     color: var(--text);
     font-weight: 800;
     font-size: 18px;
     letter-spacing: -0.01em;
   }
-  .bolt {
-    color: var(--primary);
+  .mark {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: var(--shadow-sm);
   }
   .word {
     color: var(--text);

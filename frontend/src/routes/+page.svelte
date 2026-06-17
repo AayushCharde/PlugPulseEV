@@ -197,6 +197,19 @@
           paint: { "text-color": "#06310f" },
         });
 
+        // Soft reliability-colored halo under each charger (depth/polish).
+        m.addLayer({
+          id: "station-halo",
+          type: "circle",
+          source: "stations",
+          filter: ["!", ["has", "point_count"]],
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 9, 14, 18],
+            "circle-color": colorExpr(currentTheme()),
+            "circle-opacity": 0.18,
+            "circle-blur": 0.4,
+          },
+        });
         // Individual chargers, colored by reliability.
         m.addLayer({
           id: "station-circles",
@@ -259,9 +272,9 @@
       }
 
       themeObserver = new MutationObserver(() => {
-        if (map?.getLayer("station-circles")) {
-          map.setPaintProperty("station-circles", "circle-color", colorExpr(currentTheme()));
-        }
+        const expr = colorExpr(currentTheme());
+        if (map?.getLayer("station-circles")) map.setPaintProperty("station-circles", "circle-color", expr);
+        if (map?.getLayer("station-halo")) map.setPaintProperty("station-halo", "circle-color", expr);
       });
       themeObserver.observe(document.documentElement, {
         attributes: true,
