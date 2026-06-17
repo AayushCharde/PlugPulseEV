@@ -23,10 +23,10 @@ class BBox:
         """Rough area in square degrees — used to reject absurdly large queries."""
         return (self.east - self.west) * (self.north - self.south)
 
-    def tile_key(self) -> str:
-        """A coarse, stable cache key so panning within a tile reuses one sync."""
+    def tile_key(self, source: str = "ocm") -> str:
+        """A coarse, stable per-source cache key so panning within a tile reuses one sync."""
         return (
-            f"ocm:synced:{round(self.west, 1)}:{round(self.south, 1)}:"
+            f"{source}:synced:{round(self.west, 1)}:{round(self.south, 1)}:"
             f"{round(self.east, 1)}:{round(self.north, 1)}"
         )
 

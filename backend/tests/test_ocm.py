@@ -21,6 +21,7 @@ _FULL_POI = {
 def test_maps_a_full_poi() -> None:
     row = map_poi(_FULL_POI)
     assert row is not None
+    assert row.source == "ocm"
     assert row.id == 123
     assert row.name == "Test Station"
     assert row.operator == "Acme Charging"
