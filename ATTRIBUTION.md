@@ -14,6 +14,17 @@ a non-profit, community-maintained open registry of EV charging locations.
   attribution, which must be shown to the end user where applicable.
 - We request only open data via the `opendata=true` API parameter where possible.
 
+## Charging station data — OpenStreetMap
+
+Charging locations are also sourced from [OpenStreetMap](https://www.openstreetmap.org)
+(`amenity=charging_station`), in addition to Open Charge Map.
+
+- OSM data is licensed under the [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/).
+- Attribution **© OpenStreetMap contributors** must remain visible to end users
+  (the station detail panel shows the source per station).
+- ODbL share-alike applies to any **redistributed derived database**, not to the
+  application's source code (which is AGPL-3.0).
+
 ## Map tiles — OpenFreeMap & OpenStreetMap
 
 Base map tiles are served by [OpenFreeMap](https://openfreemap.org) using

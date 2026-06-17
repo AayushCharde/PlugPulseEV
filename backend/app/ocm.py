@@ -1,54 +1,22 @@
-"""Open Charge Map (OCM) client and station upsert.
+"""Open Charge Map (OCM) client.
 
 The pure :func:`map_poi` (OCM POI dict -> :class:`StationRow`) has no I/O and is
-unit-tested. :func:`fetch_pois` and :func:`upsert_stations` handle the network
-and the database; callers degrade gracefully when either fails.
+unit-tested. :func:`fetch_pois` handles the network; the shared ``StationRow`` and
+:func:`upsert_stations` live in :mod:`app.ingest`. Callers degrade gracefully on error.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from app.config import settings
-from app.db import db
 from app.geo import BBox
+from app.ingest import StationRow
 
 OCM_API_URL = "https://api.openchargemap.io/v3/poi/"
-
-# Upsert one station; geom built from lat/lng. ST_MakePoint takes (x=lng, y=lat).
-_UPSERT_SQL = """
-INSERT INTO stations
-    (id, name, operator, max_power_kw, access_type, connectors, geom, last_synced)
-VALUES
-    ($1, $2, $3, $4, $5, $6::jsonb,
-     ST_SetSRID(ST_MakePoint($8, $7), 4326)::geography, now())
-ON CONFLICT (id) DO UPDATE SET
-    name         = EXCLUDED.name,
-    operator     = EXCLUDED.operator,
-    max_power_kw = EXCLUDED.max_power_kw,
-    access_type  = EXCLUDED.access_type,
-    connectors   = EXCLUDED.connectors,
-    geom         = EXCLUDED.geom,
-    last_synced  = now()
-"""
-
-
-@dataclass(frozen=True)
-class StationRow:
-    """A station ready to upsert into the ``stations`` table."""
-
-    id: int
-    name: str | None
-    operator: str | None
-    max_power_kw: float | None
-    access_type: str | None
-    connectors_json: str
-    lat: float
-    lng: float
 
 
 def _as_float(value: Any) -> float | None:
@@ -87,6 +55,7 @@ def map_poi(poi: dict[str, Any]) -> StationRow | None:
 
     return StationRow(
         id=poi_id,
+        source="ocm",
         name=address.get("Title"),
         operator=operator_info.get("Title"),
         max_power_kw=_max_power(connections),
@@ -117,15 +86,3 @@ async def fetch_pois(bbox: BBox, *, maxresults: int, timeout: float = 4.0) -> li
         resp.raise_for_status()
         data: list[dict[str, Any]] = resp.json()
         return data
-
-
-async def upsert_stations(rows: list[StationRow]) -> None:
-    """Upsert station rows, de-duplicated by id, into the ``stations`` table."""
-    if not rows:
-        return
-    deduped = {r.id: r for r in rows}
-    args = [
-        (r.id, r.name, r.operator, r.max_power_kw, r.access_type, r.connectors_json, r.lat, r.lng)
-        for r in deduped.values()
-    ]
-    await db.executemany(_UPSERT_SQL, args)

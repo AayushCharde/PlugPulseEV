@@ -29,6 +29,11 @@ class Settings:
     redis_url: str | None = os.environ.get("REDIS_URL") or None
     ocm_api_key: str | None = os.environ.get("OCM_API_KEY") or None
 
+    # OpenStreetMap (2nd open station source) via Overpass.
+    osm_overpass_url: str = os.environ.get(
+        "OSM_OVERPASS_URL", "https://overpass-api.de/api/interpreter"
+    )
+
     # --- OIDC / auth (optional; auth is OFF when these are unset) ---
     # Authentik (or any OIDC provider) issuer, JWKS endpoint, and our client id
     # (the expected token audience).
@@ -50,9 +55,10 @@ class Settings:
     db_pool_max_size: int = _int("DB_POOL_MAX_SIZE", 10)
     # Only score reports newer than this (older ones decay to ~0 anyway).
     reliability_lookback_hours: int = _int("RELIABILITY_LOOKBACK_HOURS", 24)
-    # How long we skip re-fetching a viewport tile from Open Charge Map.
+    # How long we skip re-fetching a viewport tile from a source (OCM / OSM).
     # Station geometry changes slowly, so this can be generous.
     ocm_sync_ttl_seconds: int = _int("OCM_SYNC_TTL_SECONDS", 600)
+    osm_sync_ttl_seconds: int = _int("OSM_SYNC_TTL_SECONDS", 600)
 
 
 settings = Settings()

@@ -9,6 +9,7 @@
 
   $: display = describeReliability(station.reliability);
   $: evidence = evidenceLine(station.reliability);
+  $: sourceLabel = station.source === "osm" ? "© OpenStreetMap" : "Open Charge Map";
 
   function onKeydown(e: KeyboardEvent): void {
     if (e.key === "Escape") dispatch("close");
@@ -60,6 +61,8 @@
         </dd>
       {/if}
     </dl>
+
+    <p class="source muted">Source: {sourceLabel}</p>
   </div>
 </aside>
 
@@ -105,6 +108,10 @@
   }
   .muted {
     color: var(--text-muted);
+  }
+  .source {
+    margin: 12px 0 0;
+    font-size: 0.78rem;
   }
   dl {
     display: grid;

@@ -11,6 +11,7 @@ import type { Reliability, ReliabilityLabel } from "$lib/reliability";
 /** A station as returned by GET /stations (mirrors backend StationOut). */
 export interface Station {
   id: number | string;
+  source: string; // "ocm" | "osm" — data provenance
   name: string | null;
   operator: string | null;
   lat: number;

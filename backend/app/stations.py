@@ -1,9 +1,10 @@
-"""The ``GET /stations`` endpoint: viewport query with on-demand OCM ingest.
+"""The ``GET /stations`` endpoint: viewport query with on-demand ingest.
 
-Flow per request: optionally refresh the viewport from Open Charge Map (guarded
-by a per-tile cache so we don't hammer OCM), then serve stations from PostGIS
-joined with a freshness-weighted reliability score. Reuses
-:func:`app.scoring.compute_reliability` so Phase 2 reports need no API change.
+Per request: optionally refresh the viewport from each open source (Open Charge
+Map + OpenStreetMap), each guarded by its own per-tile cache so we don't hammer
+them, then serve stations from PostGIS joined with a freshness-weighted
+reliability score. Reuses :func:`app.scoring.compute_reliability` so Phase 2
+reports need no API change.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
@@ -24,18 +25,20 @@ from app.cache import cache
 from app.config import settings
 from app.db import db
 from app.geo import BBox, parse_bbox
-from app.ocm import fetch_pois, map_poi, upsert_stations
+from app.ingest import StationRow, upsert_stations
+from app.ocm import fetch_pois, map_poi
+from app.osm import fetch_osm_elements, map_osm_element
 from app.scoring import Report, ReportStatus, compute_reliability
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Don't trigger an OCM ingest for absurdly large viewports — serve the DB only.
+# Don't trigger an ingest for absurdly large viewports — serve the DB only.
 MAX_BBOX_DEG2 = 25.0
 
 _SELECT_SQL = """
-SELECT id, name, operator, max_power_kw, access_type, connectors,
+SELECT id, source, name, operator, max_power_kw, access_type, connectors,
        ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng
 FROM stations
 WHERE ST_Intersects(geom, ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography)
@@ -60,6 +63,7 @@ class ReliabilityOut(BaseModel):
 
 class StationOut(BaseModel):
     id: int
+    source: str
     name: str | None
     operator: str | None
     max_power_kw: float | None
@@ -71,9 +75,10 @@ class StationOut(BaseModel):
 
 
 def connector_titles(connectors_raw: Any) -> list[str]:
-    """Distinct connector-type titles from the raw OCM Connections array.
+    """Distinct connector-type titles from the connectors array.
 
     Accepts either a parsed list or a JSON string (asyncpg returns JSONB as text).
+    Both OCM and OSM store the same ``[{"ConnectionType":{"Title": …}}]`` shape.
     """
     if isinstance(connectors_raw, str):
         try:
@@ -122,35 +127,64 @@ def assemble_reliability(
     return result
 
 
+# --- on-demand ingest, one guarded sync per source ---
+
 # Keep references to background tasks so they aren't garbage-collected mid-flight.
 _background_tasks: set[asyncio.Task[None]] = set()
 
+# A producer fetches + maps a source's raw data for a viewport into StationRows.
+Producer = Callable[[BBox, int], Awaitable[list[StationRow]]]
 
-async def _sync_ocm(box: BBox, maxresults: int) -> None:
-    """Refresh this viewport from OCM unless recently synced or far too large.
 
-    Never raises: on any OCM/DB error we log and serve whatever the DB has.
+async def _produce_ocm(box: BBox, maxresults: int) -> list[StationRow]:
+    pois = await fetch_pois(box, maxresults=maxresults)
+    return [row for poi in pois if (row := map_poi(poi)) is not None]
+
+
+async def _produce_osm(box: BBox, maxresults: int) -> list[StationRow]:
+    elements = await fetch_osm_elements(box)
+    return [row for el in elements if (row := map_osm_element(el)) is not None]
+
+
+async def _sync_source(
+    box: BBox, maxresults: int, *, source: str, produce: Producer, ttl: int
+) -> None:
+    """Refresh one source for a viewport unless recently synced or too large.
+
+    Never raises: on any network/DB error we log and serve whatever the DB has.
     """
     if box.area_deg2 > MAX_BBOX_DEG2:
         return
-    key = box.tile_key()
+    key = box.tile_key(source)
     if await cache.get(key) is not None:
         return
     try:
-        pois = await fetch_pois(box, maxresults=maxresults)
-        rows = [row for poi in pois if (row := map_poi(poi)) is not None]
+        rows = await produce(box, maxresults)
         await upsert_stations(rows)
     except (httpx.HTTPError, asyncpg.PostgresError) as exc:
-        logger.warning("OCM sync failed for tile %s: %s", key, exc)
+        logger.warning("%s sync failed for tile %s: %s", source, key, exc)
         return  # don't set the guard, so the next request retries
-    await cache.set(key, "1", settings.ocm_sync_ttl_seconds)
+    await cache.set(key, "1", ttl)
+
+
+async def _sync_ocm(box: BBox, maxresults: int) -> None:
+    await _sync_source(
+        box, maxresults, source="ocm", produce=_produce_ocm, ttl=settings.ocm_sync_ttl_seconds
+    )
+
+
+async def _sync_osm(box: BBox, maxresults: int) -> None:
+    await _sync_source(
+        box, maxresults, source="osm", produce=_produce_osm, ttl=settings.osm_sync_ttl_seconds
+    )
 
 
 def _schedule_background_sync(box: BBox, maxresults: int) -> None:
-    """Fire-and-forget OCM refresh so a warm viewport isn't blocked by the network."""
-    task = asyncio.create_task(_sync_ocm(box, maxresults))
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    """Fire-and-forget refresh of all sources so a warm viewport isn't blocked."""
+    for coro in (_sync_ocm(box, maxresults), _sync_osm(box, maxresults)):
+        task = asyncio.create_task(coro)
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
 
 async def _fetch_rows(
@@ -186,11 +220,11 @@ async def list_stations(
 
     rows = await _fetch_rows(box, connector, min_power_kw, capped)
     if rows:
-        # Warm viewport: refresh from OCM in the background so the response is fast.
+        # Warm viewport: refresh sources in the background so the response is fast.
         _schedule_background_sync(box, capped)
     else:
-        # Cold/empty viewport: block on a sync, then re-query once.
-        await _sync_ocm(box, capped)
+        # Cold/empty viewport: block on syncing all sources in parallel, then re-query.
+        await asyncio.gather(_sync_ocm(box, capped), _sync_osm(box, capped))
         rows = await _fetch_rows(box, connector, min_power_kw, capped)
 
     station_ids = [row["id"] for row in rows]
@@ -206,6 +240,7 @@ async def list_stations(
     return [
         StationOut(
             id=row["id"],
+            source=row["source"],
             name=row["name"],
             operator=row["operator"],
             max_power_kw=row["max_power_kw"],

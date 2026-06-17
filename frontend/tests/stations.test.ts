@@ -14,6 +14,7 @@ const bbox = { west: 78.3, south: 17.3, east: 78.6, north: 17.5 };
 function station(overrides: Partial<Station> = {}): Station {
   return {
     id: 1,
+    source: "ocm",
     name: "Test",
     operator: "Acme",
     lat: 17.4,
