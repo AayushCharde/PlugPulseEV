@@ -35,6 +35,10 @@
   --shadow-md: 0 4px 12px rgb(15 23 42 / 0.1);
   --shadow-lg: 0 12px 32px rgb(15 23 42 / 0.18);
   --space: 8px;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur: 180ms;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -172,6 +176,34 @@ a {
   height: 10px;
   border-radius: 50%;
   flex: none;
+}
+
+/* reliability status badge (used by the station detail panel) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 12%, var(--surface));
+}
+.badge .dot {
+  background: currentColor;
+}
+.badge-green {
+  color: var(--rel-green);
+}
+.badge-amber {
+  color: var(--rel-amber);
+}
+.badge-red {
+  color: var(--rel-red);
+}
+.badge-grey {
+  color: var(--rel-grey);
 }
 
 /* accessible focus ring everywhere */
